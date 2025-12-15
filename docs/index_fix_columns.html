@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CD Calendrier - Colonnes fixes</title>
+  <style>
+    :root{
+      --colW:180px;
+      --border:#ddd;
+      --muted:#666;
+      --bg:#fafafa;
+      --card:#fff;
+      --shadow:0 6px 18px rgba(0,0,0,.12);
+    }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:var(--bg);
+      color:#111;
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:10;
+      background:#fff;
+      border-bottom:1px solid var(--border);
+      padding:10px 12px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .left, .right{ display:flex; gap:8px; align-items:center; }
+    button{
+      border:1px solid var(--border);
+      background:#fff;
+      padding:8px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    button:hover{ background:#f3f3f3; }
+    .meta{
+      font-size:13px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .title{
+      font-weight:800;
+      font-size:15px;
+      margin:0;
+    }
+
+    /* Calendar fixed columns */
+    .calendar{
+      display:flex;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      padding:10px;
+      gap:0;
+    }
+    .day-column{
+      flex:0 0 var(--colW);
+      border:1px solid var(--border);
+      margin:0;
+      padding:6px;
+      box-sizing:border-box;
+      min-height:240px;
+      background:#fff;
+    }
+
+    /* ✅ FIX: les headers de jours ne doivent plus être "collés" sur les commandes */
+    .day-header{
+      font-weight:800;
+      text-align:center;
+      background:#f9f9f9;
+      padding:6px 4px;
+      border-bottom:1px solid #ccc;
+      border-radius:8px;
+
+      /* IMPORTANT: plus de sticky => ne recouvre jamais les capsules */
+      position:static;
+      top:auto;
+      z-index:auto;
+
+      margin-bottom:8px; /* espace clair avant la 1ère capsule */
+    }
+
+    /* Capsule */
+    .capsule{
+      margin:8px 0;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--card);
+      box-shadow:0 2px 8px rgba(0,0,0,.06);
+      overflow:hidden;
+      cursor:pointer;
+    }
+    .capsule:active{ transform:translateY(1px); }
+    .cap-top{
+      padding:8px 9px 6px 9px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .cap-time{
+      font-weight:900;
+      font-size:13px;
+    }
+    .cap-s{
+      font-weight:900;
+      font-size:12px;
+      color:#111;
+      background:#f1f1f1;
+      border:1px solid #e1e1e1;
+      padding:2px 6px;
+      border-radius:999px;
+      white-space:nowrap;
+    }
+    .cap-theme{
+      font-size:12px;
+      color:#111;
+      font-weight:800;
+      margin-top:2px;
+      line-height:1.2;
+    }
+    .cap-sub{
+      font-size:11px;
+      color:var(--muted);
+      margin-top:3px;
+      line-height:1.2;
+    }
+    .warn-badge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:22px;height:22px;
+      border-radius:999px;
+      background:#fff1b8;
+      border:1px solid #e6cf62;
+      font-weight:900;
+      flex:0 0 auto;
+    }
+
+    /* Thumb carousel in capsule */
+    .thumb-wrap{
+      position:relative;
+      border-top:1px solid #eee;
+      background:#fff;
+    }
+    .thumb-strip{
+      display:flex;
+      overflow-x:auto;
+      scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch;
+      gap:0;
+    }
+    .thumb-strip::-webkit-scrollbar{ height:8px; }
+    .thumb-strip::-webkit-scrollbar-thumb{ background:#dcdcdc; border-radius:999px; }
+    .thumb-slide{
+      flex:0 0 100%;
+      scroll-snap-align:start;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height:150px;
+      background:#fff;
+    }
+    .thumb-slide img{
+      max-width:100%;
+      max-height:100%;
+      width:auto;
+      height:auto;
+      object-fit:contain; /* PAS DE CROP */
+      display:block;
+    }
+    .no-photo{
+      width:100%;
+      height:150px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#999;
+      font-weight:800;
+      letter-spacing:.4px;
+      background:repeating-linear-gradient(
+        45deg,
+        #fafafa,
+        #fafafa 10px,
+        #f1f1f1 10px,
+        #f1f1f1 20px
+      );
+    }
+    .thumb-nav{
+      position:absolute;
+      top:8px;
+      right:8px;
+      display:flex;
+      gap:6px;
+      align-items:center;
+    }
+    .pill{
+      font-size:11px;
+      color:#111;
+      background:rgba(255,255,255,.9);
+      border:1px solid #e5e5e5;
+      padding:2px 7px;
+      border-radius:999px;
+      font-weight:800;
+    }
+    .thumb-btn{
+      border:1px solid #e5e5e5;
+      background:rgba(255,255,255,.95);
+      width:28px;height:28px;
+      border-radius:10px;
+      font-weight:900;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      user-select:none;
+    }
+    .thumb-btn:hover{ background:#fff; }
+
+    /* Modal */
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:1000;
+    }
+    .modal{
+      width:min(980px, 100%);
+      max-height:92vh;
+      background:#fff;
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:var(--shadow);
+      display:flex;
+      flex-direction:column;
+      position:relative;
+    }
+    .modal-header{
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      background:#fff;
+    }
+    .modal-title{
+      font-weight:900;
+      font-size:14px;
+      margin:0;
+      line-height:1.1;
+    }
+    .modal-close{
+      border:1px solid var(--border);
+      background:#fff;
+      padding:8px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:900;
+    }
+    .modal-body{
+      display:grid;
+      grid-template-columns: 1.3fr .9fr;
+      gap:10px;
+      padding:10px;
+      overflow:auto;
+    }
+    @media (max-width:900px){
+      .modal-body{ grid-template-columns:1fr; }
+    }
+
+    /* Full carousel in modal */
+    .viewer{
+      border:1px solid #eee;
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+      position:relative;
+    }
+    .viewer-strip{
+      display:flex;
+      overflow-x:auto;
+      scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch;
+      gap:0;
+      height:min(62vh, 560px);
+      background:#fff;
+    }
+    .viewer-slide{
+      flex:0 0 100%;
+      scroll-snap-align:start;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#fff;
+      position:relative;
+    }
+    .viewer-zoomArea{
+      width:100%;
+      height:100%;
+      overflow:auto;
+      cursor:grab;
+    }
+    .viewer-zoomArea.dragging{ cursor:grabbing; }
+    .viewer-slide img{
+      display:block;
+      max-width:100%;
+      max-height:100%;
+      width:auto;
+      height:auto;
+      object-fit:contain;
+      transform-origin: top left;
+    }
+    .viewer-nav{
+      position:absolute;
+      top:10px;
+      right:10px;
+      display:flex;
+      gap:6px;
+      align-items:center;
+      z-index:5;
+    }
+
+    .details{
+      border:1px solid #eee;
+      border-radius:14px;
+      padding:10px;
+      background:#fff;
+      height:fit-content;
+    }
+    .kv{
+      display:grid;
+      grid-template-columns: 140px 1fr;
+      gap:6px 10px;
+      font-size:13px;
+      align-items:start;
+    }
+    .k{ color:var(--muted); font-weight:700; }
+    .v{ color:#111; font-weight:700; word-break:break-word; }
+
+    /* Warning overlay band */
+    .warn-overlay{
+      position:absolute;
+      inset:0;
+      background:rgba(0,0,0,.35);
+      display:none;
+      align-items:flex-start;
+      justify-content:center;
+      padding:18px;
+      z-index:2000;
+    }
+    .warn-panel{
+      width:min(920px, 100%);
+      background:#ffe77a;
+      border:2px solid #e0c24f;
+      border-radius:16px;
+      padding:18px 16px;
+      box-shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    .warn-panel h3{
+      margin:0 0 10px 0;
+      font-size:16px;
+      font-weight:900;
+    }
+    .warn-list{
+      margin:0;
+      padding-left:18px;
+      font-weight:800;
+      line-height:1.35;
+    }
+    .warn-actions{
+      margin-top:14px;
+      display:flex;
+      justify-content:flex-end;
+    }
+    .warn-ok{
+      background:#111;
+      color:#fff;
+      border:0;
+      padding:10px 14px;
+      border-radius:12px;
+      font-weight:900;
+      cursor:pointer;
+    }
+    .warn-ok:hover{ filter:brightness(1.05); }
+/* ---------- Responsive (PC / Tablette / Téléphone) ---------- */
+
+/* PC par défaut : colonnes fixes */
+:root { --colW: 180px; }
+
+/* Tablette */
+@media (max-width: 1024px){
+  :root { --colW: 210px; }
+}
+
+/* Téléphone : 1 colonne large (swipe horizontal pour changer de jour) */
+@media (max-width: 640px){
+  :root { --colW: 88vw; }
+  .modal-body{ grid-template-columns: 1fr; }
+  .viewer-strip{ height: min(58vh, 480px); }
+}
+  
+</style>
+</head>
+
+<body>
+<header>
+  <div class="left">
+    <div>
+      <div class="title">CD Calendrier</div>
+      <div class="meta" id="weekLabel">Chargement...</div>
+    </div>
+  </div>
+  <div class="right">
+    <div class="meta" id="countLabel"></div>
+    <button id="prevBtn" aria-label="Semaine précédente">Semaine précédente</button>
+    <button id="nextBtn" aria-label="Semaine suivante">Semaine suivante</button>
+  </div>
+</header>
+
+<div class="calendar" id="calendar"></div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div>
+        <p class="modal-title" id="modalTitle">Détails</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="modal-close" id="modalClose" aria-label="Fermer">Fermer</button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <div class="viewer">
+        <div class="viewer-strip" id="viewerStrip"></div>
+
+        <div class="viewer-nav">
+          <div class="pill" id="viewerCount">0/0</div>
+          <div class="thumb-btn" id="viewerPrev" title="Précédent">&lt;</div>
+          <div class="thumb-btn" id="viewerNext" title="Suivant">&gt;</div>
+          <div class="thumb-btn" id="zoomBtn" title="Zoom">Z</div>
+        </div>
+      </div>
+
+      <div class="details">
+        <div class="kv" id="detailsKv"></div>
+      </div>
+    </div>
+
+    <!-- Warning overlay -->
+    <div class="warn-overlay" id="warnOverlay">
+      <div class="warn-panel">
+        <h3>WARNING</h3>
+        <ul class="warn-list" id="warnList"></ul>
+        <div class="warn-actions">
+          <button class="warn-ok" id="warnOk">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function parseFRDateTime(s){
+    if(!s || typeof s !== "string") return null;
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if(!m) return null;
+    const dd = Number(m[1]), mm = Number(m[2]), yyyy = Number(m[3]);
+    const hh = Number(m[4]), mi = Number(m[5]), ss = Number(m[6]||"0");
+    return new Date(yyyy, mm-1, dd, hh, mi, ss);
+  }
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function startOfWeekMonday(d){
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const day = x.getDay();
+    const diff = (day === 0 ? -6 : 1 - day);
+    x.setDate(x.getDate() + diff);
+    x.setHours(0,0,0,0);
+    return x;
+  }
+  function addDays(d, n){
+    const x = new Date(d.getTime());
+    x.setDate(x.getDate()+n);
+    return x;
+  }
+  function sameDay(a,b){
+    return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  }
+  function frDayLabel(d){
+    const days = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+    return `${days[d.getDay()]} ${d.getDate()}/${pad2(d.getMonth()+1)}`;
+  }
+  function extractSNumber(pdfName){
+    const m = String(pdfName||"").match(/\bS\d{3,}\b/i);
+    return m ? m[0].toUpperCase() : "";
+  }
+
+  let allItems = [];
+  let manifestMap = new Map();
+  let weekStart = null;
+
+  let modalCurrent = null;
+  let zoomLevel = 1;
+  const zoomLevels = [1, 1.6, 2.2, 3];
+
+  async function loadData(){
+    const [itemsRes, manRes] = await Promise.all([
+      fetch("./items.json", {cache:"no-store"}),
+      fetch("./images_manifest.json", {cache:"no-store"})
+    ]);
+    const blocks = await itemsRes.json();
+    const man = await manRes.json();
+
+    manifestMap.clear();
+    for(const m of man){
+      const pdf = m.pdf || "";
+      const cd = Number(m.cd_index || 1);
+      const imgIndex = Number(m.img_index || 1);
+      const key = `${pdf}||${cd}`;
+      if(!manifestMap.has(key)) manifestMap.set(key, []);
+      manifestMap.get(key).push({ thumb: m.thumb || "", full: m.full || "", img_index: imgIndex });
+    }
+    for(const [k, arr] of manifestMap.entries()){
+      arr.sort((a,b)=>a.img_index-b.img_index);
+    }
+
+    allItems = [];
+    for(const b of blocks){
+      const pdf = b.file;
+      for(const it of (b.items||[])){
+        const dt = parseFRDateTime(it.date_livraison || "");
+        allItems.push({
+          pdf,
+          cd_index: Number(it.cd_index || 1),
+          theme: it["Thème"] || "",
+          message: it["Message"] || "",
+          age: it.age || "",
+          parfum: it.parfum || "",
+          etages_count: it.etages_count || "",
+          taille_pers: it.taille_pers || "",
+          date_livraison: it.date_livraison || "",
+          dt,
+          avertissements: Array.isArray(it.avertissements) ? it.avertissements : []
+        });
+      }
+    }
+
+        // pick initial week = semaine actuelle (aujourd'hui)
+    weekStart = startOfWeekMonday(new Date());
+
+    render();
+
+  }
+
+  function render(){
+    const cal = document.getElementById("calendar");
+    cal.innerHTML = "";
+
+    const weekEnd = addDays(weekStart, 6);
+    document.getElementById("weekLabel").textContent =
+      `Semaine: ${frDayLabel(weekStart)} -> ${frDayLabel(weekEnd)}`;
+
+    const inWeek = allItems.filter(x => x.dt && x.dt >= weekStart && x.dt < addDays(weekStart, 7));
+    inWeek.sort((a,b)=>a.dt-b.dt);
+
+    document.getElementById("countLabel").textContent = `${inWeek.length} commande(s)`;
+
+    for(let i=0;i<7;i++){
+      const day = addDays(weekStart, i);
+      const col = document.createElement("div");
+      col.className = "day-column";
+
+      const head = document.createElement("div");
+      head.className = "day-header";
+      head.textContent = frDayLabel(day);
+      col.appendChild(head);
+
+      const dayItems = inWeek.filter(x => sameDay(x.dt, day));
+      for(const it of dayItems){
+        col.appendChild(buildCapsule(it));
+      }
+
+      cal.appendChild(col);
+    }
+  }
+
+  function buildCapsule(it){
+    const cap = document.createElement("div");
+    cap.className = "capsule";
+    cap.tabIndex = 0;
+
+    const sNum = extractSNumber(it.pdf);
+
+    const top = document.createElement("div");
+    top.className = "cap-top";
+
+    const left = document.createElement("div");
+    left.style.minWidth = "0";
+
+    const time = document.createElement("div");
+    time.className = "cap-time";
+    time.textContent = `${pad2(it.dt.getHours())}:${pad2(it.dt.getMinutes())}`;
+
+    const theme = document.createElement("div");
+    theme.className = "cap-theme";
+    theme.textContent = it.theme || "(Sans thème)";
+
+    const sub = document.createElement("div");
+    sub.className = "cap-sub";
+    const parts = [];
+    if(it.etages_count) parts.push(`${it.etages_count} étage(s)`);
+    if(it.taille_pers) parts.push(`${it.taille_pers} pers`);
+    sub.textContent = parts.join(" • ");
+
+    left.appendChild(time);
+    left.appendChild(theme);
+    if(sub.textContent) left.appendChild(sub);
+
+    const right = document.createElement("div");
+    right.style.display="flex";
+    right.style.gap="6px";
+    right.style.alignItems="center";
+
+    if(sNum){
+      const pill = document.createElement("div");
+      pill.className = "cap-s";
+      pill.textContent = sNum;
+      right.appendChild(pill);
+    }
+
+    if(it.avertissements && it.avertissements.length){
+      const wb = document.createElement("div");
+      wb.className = "warn-badge";
+      wb.innerHTML = "&#9888;";
+      right.appendChild(wb);
+    }
+
+    top.appendChild(left);
+    top.appendChild(right);
+    cap.appendChild(top);
+
+    const wrap = document.createElement("div");
+    wrap.className = "thumb-wrap";
+
+    const nav = document.createElement("div");
+    nav.className = "thumb-nav";
+
+    const key = `${it.pdf}||${it.cd_index}`;
+    const imgs = (manifestMap.get(key) || []).filter(x => x.thumb && x.full);
+
+    if(!imgs.length){
+      const no = document.createElement("div");
+      no.className = "no-photo";
+      no.textContent = "NO PHOTO";
+      wrap.appendChild(no);
+    } else {
+      const strip = document.createElement("div");
+      strip.className = "thumb-strip";
+
+      imgs.forEach((im, idx) => {
+        const slide = document.createElement("div");
+        slide.className = "thumb-slide";
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.src = "./" + im.thumb;
+        img.alt = `Photo ${idx+1}`;
+        slide.appendChild(img);
+        strip.appendChild(slide);
+      });
+
+      const count = document.createElement("div");
+      count.className = "pill";
+      count.textContent = `1/${imgs.length}`;
+
+      const prev = document.createElement("div");
+      prev.className = "thumb-btn";
+      prev.textContent = "<";
+      const next = document.createElement("div");
+      next.className = "thumb-btn";
+      next.textContent = ">";
+
+      function scrollToIndex(n){
+        const w = strip.clientWidth;
+        strip.scrollTo({left: n*w, behavior:"smooth"});
+      }
+      prev.addEventListener("click", (e)=>{
+        e.stopPropagation();
+        const idx = Math.round(strip.scrollLeft / strip.clientWidth);
+        scrollToIndex(Math.max(0, idx-1));
+      });
+      next.addEventListener("click", (e)=>{
+        e.stopPropagation();
+        const idx = Math.round(strip.scrollLeft / strip.clientWidth);
+        scrollToIndex(Math.min(imgs.length-1, idx+1));
+      });
+
+      strip.addEventListener("scroll", ()=>{
+        const idx = Math.round(strip.scrollLeft / strip.clientWidth);
+        count.textContent = `${Math.min(imgs.length, idx+1)}/${imgs.length}`;
+      });
+
+      nav.appendChild(count);
+      if(imgs.length>1){
+        nav.appendChild(prev);
+        nav.appendChild(next);
+      }
+
+      wrap.appendChild(strip);
+    }
+
+    wrap.appendChild(nav);
+    cap.appendChild(wrap);
+
+    cap.addEventListener("click", ()=>openModal(it));
+    cap.addEventListener("keydown", (e)=>{
+      if(e.key==="Enter" || e.key===" "){
+        e.preventDefault();
+        openModal(it);
+      }
+    });
+
+    return cap;
+  }
+
+  const modalBackdrop = document.getElementById("modalBackdrop");
+  const modalClose = document.getElementById("modalClose");
+  const viewerStrip = document.getElementById("viewerStrip");
+  const viewerCount = document.getElementById("viewerCount");
+  const viewerPrev = document.getElementById("viewerPrev");
+  const viewerNext = document.getElementById("viewerNext");
+  const zoomBtn = document.getElementById("zoomBtn");
+  const modalTitle = document.getElementById("modalTitle");
+  const detailsKv = document.getElementById("detailsKv");
+
+  const warnOverlay = document.getElementById("warnOverlay");
+  const warnList = document.getElementById("warnList");
+  const warnOk = document.getElementById("warnOk");
+
+  function openModal(it){
+    modalCurrent = it;
+    zoomLevel = 1;
+
+    const sNum = extractSNumber(it.pdf);
+    modalTitle.textContent = `${sNum ? (sNum + " - ") : ""}${it.theme || "Détails"}`;
+
+    detailsKv.innerHTML = "";
+    const fields = [
+      ["PDF", it.pdf],
+      ["CD", String(it.cd_index)],
+      ["Livraison", it.date_livraison || ""],
+      ["Thème", it.theme || ""],
+      ["Message", it.message || ""],
+      ["Âge", it.age || ""],
+      ["Parfum", it.parfum || ""],
+      ["Étages", it.etages_count || ""],
+      ["Taille", it.taille_pers || ""],
+    ];
+    for(const [k,v] of fields){
+      const dk = document.createElement("div");
+      dk.className="k";
+      dk.textContent=k;
+      const dv = document.createElement("div");
+      dv.className="v";
+      dv.textContent=v || "";
+      detailsKv.appendChild(dk);
+      detailsKv.appendChild(dv);
+    }
+
+    viewerStrip.innerHTML = "";
+    const key = `${it.pdf}||${it.cd_index}`;
+    const imgs = (manifestMap.get(key) || []).filter(x => x.thumb && x.full);
+
+    if(!imgs.length){
+      const slide = document.createElement("div");
+      slide.className = "viewer-slide";
+      const no = document.createElement("div");
+      no.className = "no-photo";
+      no.style.height = "100%";
+      no.textContent = "NO PHOTO";
+      slide.appendChild(no);
+      viewerStrip.appendChild(slide);
+      viewerCount.textContent = `0/0`;
+    } else {
+      imgs.forEach((im, idx)=>{
+        const slide = document.createElement("div");
+        slide.className = "viewer-slide";
+
+        const zoomArea = document.createElement("div");
+        zoomArea.className = "viewer-zoomArea";
+
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.src = "./" + im.full;
+        img.alt = `Photo ${idx+1}`;
+
+        zoomArea.appendChild(img);
+        slide.appendChild(zoomArea);
+        viewerStrip.appendChild(slide);
+
+        enableDragScroll(zoomArea);
+      });
+
+      viewerCount.textContent = `1/${imgs.length}`;
+      viewerStrip.addEventListener("scroll", ()=>{
+        const idx = Math.round(viewerStrip.scrollLeft / viewerStrip.clientWidth);
+        viewerCount.textContent = `${Math.min(imgs.length, idx+1)}/${imgs.length}`;
+      }, {passive:true});
+    }
+
+    if(it.avertissements && it.avertissements.length){
+      warnList.innerHTML = "";
+      it.avertissements.forEach(w=>{
+        const li = document.createElement("li");
+        li.textContent = w;
+        warnList.appendChild(li);
+      });
+      warnOverlay.style.display = "flex";
+    } else {
+      warnOverlay.style.display = "none";
+    }
+
+    modalBackdrop.style.display = "flex";
+  }
+
+  function closeModal(){
+    modalBackdrop.style.display = "none";
+    viewerStrip.innerHTML = "";
+    warnOverlay.style.display = "none";
+    modalCurrent = null;
+  }
+
+  modalClose.addEventListener("click", closeModal);
+  modalBackdrop.addEventListener("click", (e)=>{
+    if(warnOverlay.style.display === "flex") return;
+    if(e.target === modalBackdrop) closeModal();
+  });
+  document.addEventListener("keydown", (e)=>{
+    if(e.key==="Escape" && modalBackdrop.style.display==="flex"){
+      if(warnOverlay.style.display === "flex") return;
+      closeModal();
+    }
+  });
+
+  warnOk.addEventListener("click", ()=>{ warnOverlay.style.display = "none"; });
+
+  viewerPrev.addEventListener("click", ()=>{
+    const w = viewerStrip.clientWidth;
+    const idx = Math.round(viewerStrip.scrollLeft / w);
+    viewerStrip.scrollTo({left: Math.max(0, (idx-1)*w), behavior:"smooth"});
+  });
+  viewerNext.addEventListener("click", ()=>{
+    const w = viewerStrip.clientWidth;
+    const idx = Math.round(viewerStrip.scrollLeft / w);
+    viewerStrip.scrollTo({left: (idx+1)*w, behavior:"smooth"});
+  });
+
+  zoomBtn.addEventListener("click", ()=>{
+    if(!viewerStrip.children.length) return;
+
+    const idx = Math.round(viewerStrip.scrollLeft / viewerStrip.clientWidth);
+    const slide = viewerStrip.children[idx];
+    const zoomArea = slide.querySelector(".viewer-zoomArea");
+    const img = slide.querySelector("img");
+    if(!img || !zoomArea) return;
+
+    const current = zoomLevel;
+    const nextIdx = (zoomLevels.indexOf(current) + 1) % zoomLevels.length;
+    zoomLevel = zoomLevels[nextIdx];
+
+    img.style.transform = `scale(${zoomLevel})`;
+
+    if(zoomLevel === 1){
+      zoomArea.scrollTop = 0;
+      zoomArea.scrollLeft = 0;
+    }
+  });
+
+  function enableDragScroll(el){
+    let down = false;
+    let startX=0, startY=0, startL=0, startT=0;
+
+    el.addEventListener("mousedown", (e)=>{
+      down = true;
+      el.classList.add("dragging");
+      startX = e.clientX;
+      startY = e.clientY;
+      startL = el.scrollLeft;
+      startT = el.scrollTop;
+      e.preventDefault();
+    });
+    window.addEventListener("mousemove", (e)=>{
+      if(!down) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      el.scrollLeft = startL - dx;
+      el.scrollTop = startT - dy;
+    });
+    window.addEventListener("mouseup", ()=>{
+      down = false;
+      el.classList.remove("dragging");
+    });
+
+    el.addEventListener("wheel", (e)=>{
+      if(!e.ctrlKey) return;
+      e.preventDefault();
+      const idx = Math.round(viewerStrip.scrollLeft / viewerStrip.clientWidth);
+      const slide = viewerStrip.children[idx];
+      const img = slide ? slide.querySelector("img") : null;
+      if(!img) return;
+
+      let z = zoomLevel;
+      z += (e.deltaY < 0 ? 0.12 : -0.12);
+      z = Math.max(1, Math.min(3.5, z));
+      zoomLevel = z;
+      img.style.transform = `scale(${zoomLevel})`;
+    }, {passive:false});
+  }
+
+  document.getElementById("prevBtn").addEventListener("click", ()=>{
+    weekStart = addDays(weekStart, -7);
+    render();
+  });
+  document.getElementById("nextBtn").addEventListener("click", ()=>{
+    weekStart = addDays(weekStart, 7);
+    render();
+  });
+
+  loadData().catch(err=>{
+    console.error(err);
+    document.getElementById("weekLabel").textContent = "Erreur de chargement (voir Console).";
+  });
+</script>
+</body>
+</html>
